@@ -37,7 +37,13 @@
       pre.textContent = "Loading...";
       try {
         const report = await fetch(`https://project4-backened.onrender.com/api/plans/${planId}/report`).then(r => r.json());
-        pre.textContent = report.join("\n");
+        if (!Array.isArray(report)) {
+          pre.textContent = JSON.stringify(report, null, 2);
+          return;
+        }
+        pre.textContent = report
+            .map(row => `${row.line} — closed suspension total: ${row.totalSuspendedMinutesForLeaf} min`)
+            .join("\n");
       } catch (e) {
         pre.textContent = "Error: " + e.message;
       }

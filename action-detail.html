@@ -21,20 +21,66 @@
   <main class="main">
     <div class="card">
       <p class="card-title">Action Detail</p>
-      <p class="card-sub">Select an action and trigger a lifecycle transition.</p>
+      <p class="card-sub">Lifecycle transitions, review workflow (Week 2), utilisations, and suspension history.</p>
       <div class="field">
         <label for="actionId">Action ID</label>
         <input id="actionId" type="number" value="104" min="1">
+        <button type="button" class="btn btn-primary" onclick="refreshAction()">Refresh</button>
+        <span id="statusBadge" class="badge badge-proposed">—</span>
       </div>
-      <div class="actions-row">
-        <button class="btn btn-primary" onclick="transition('implement')">Implement</button>
-        <button class="btn btn-ghost"   onclick="suspendAction()">Suspend</button>
-        <button class="btn btn-ghost"   onclick="transition('resume')">Resume</button>
-        <button class="btn btn-ghost"   onclick="transition('complete')">Complete</button>
-        <button class="btn btn-danger"  onclick="transition('abandon')">Abandon</button>
+      <div class="actions-row" id="lifecycleRow">
+        <button type="button" class="btn btn-primary" id="btnImplement" onclick="transition('implement')">Implement</button>
+        <button type="button" class="btn btn-ghost" id="btnSuspend" onclick="suspendAction()">Suspend</button>
+        <button type="button" class="btn btn-ghost" id="btnResume" onclick="transition('resume')">Resume</button>
+        <button type="button" class="btn btn-ghost" id="btnComplete" onclick="transition('complete')">Complete</button>
+        <button type="button" class="btn btn-ghost" id="btnReview" onclick="postPlain('review')">Review</button>
+        <button type="button" class="btn btn-primary" id="btnApprove" onclick="postPlain('approve')">Approve</button>
+        <button type="button" class="btn btn-ghost" id="btnReject" onclick="rejectAction()">Reject</button>
+        <button type="button" class="btn btn-danger" id="btnAbandon" onclick="transition('abandon')">Abandon</button>
       </div>
-      <pre id="output">Run a transition to see the response.</pre>
+      <div class="field">
+        <label for="rejectReason">Reject reason</label>
+        <input id="rejectReason" type="text" style="width:min(420px,100%)" placeholder="Required when rejecting from REVIEWING">
+      </div>
+      <pre id="output">Click Refresh or run a transition.</pre>
     </div>
+
+    <div class="card">
+      <p class="card-title">Asset utilisations</p>
+      <p class="card-sub">Rows appear after an implemented action is completed or approved with ASSET allocations (<code>GET /api/actions/{id}/utilisations</code>).</p>
+      <button type="button" class="btn btn-ghost" onclick="loadUtilisations()">Load utilisations</button>
+      <table style="margin-top:12px">
+        <thead>
+          <tr>
+            <th>Asset ID</th>
+            <th>Resource</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Minutes</th>
+          </tr>
+        </thead>
+        <tbody id="utilRows"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <p class="card-title">Suspension history</p>
+      <p class="card-sub"><code>GET /api/actions/{id}/suspensions</code> — ongoing suspensions show duration as “ongoing”.</p>
+      <button type="button" class="btn btn-ghost" onclick="loadSuspensions()">Load suspensions</button>
+      <table style="margin-top:12px">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Reason</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody id="suspRows"></tbody>
+      </table>
+    </div>
+
     <div class="card">
       <p class="card-title">Add consumable allocation (test F8)</p>
       <p class="card-sub">Attach a <strong>GENERAL</strong> consumable line with a large <strong>quantity</strong> (e.g. resource type <strong>3</strong> = Concrete in sample DB). Then <strong>Implement</strong> → <strong>Complete</strong>. On complete, the pool withdraws that quantity; if it goes negative, open <a href="ledger-view.html">Ledger</a> → memo account (see Dashboard) for alert entries.</p>
@@ -43,12 +89,76 @@
         <input id="resTypeId" type="number" value="3" min="1" style="width:100px">
         <label for="allocQty">Quantity</label>
         <input id="allocQty" type="number" value="500" min="0.01" step="any" style="width:120px">
-        <button class="btn btn-primary" onclick="addAllocation()">POST allocation</button>
+        <button type="button" class="btn btn-primary" onclick="addAllocation()">POST allocation</button>
       </div>
     </div>
   </main>
   <script>
     const API_BASE = "https://project4-backened.onrender.com";
+
+    let currentStatus = null;
+
+    function badgeClassForStatus(status) {
+      const raw = (status || "PROPOSED").toLowerCase();
+      return "badge-" + raw;
+    }
+
+    function setStatusUi(status) {
+      currentStatus = status || null;
+      const badge = document.getElementById("statusBadge");
+      const label = (status || "—").toString().replace(/_/g, " ");
+      badge.className = "badge " + badgeClassForStatus(status || "PROPOSED");
+      badge.textContent = label;
+
+      const setBtn = (id, enabled) => {
+        const el = document.getElementById(id);
+        el.disabled = !enabled;
+        el.style.opacity = enabled ? "" : "0.45";
+      };
+
+      const s = currentStatus;
+      const terminal = s === "COMPLETED" || s === "ABANDONED";
+
+      setBtn("btnImplement", !terminal && s === "PROPOSED");
+      setBtn("btnSuspend", !terminal && s === "IN_PROGRESS");
+      setBtn("btnResume", !terminal && s === "SUSPENDED");
+      setBtn("btnComplete", !terminal && s === "IN_PROGRESS");
+      setBtn("btnReview", !terminal && s === "IN_PROGRESS");
+      setBtn("btnApprove", !terminal && s === "REVIEWING");
+      setBtn("btnReject", !terminal && s === "REVIEWING");
+      setBtn("btnAbandon", !terminal && (s === "IN_PROGRESS" || s === "REVIEWING" || s === "SUSPENDED"));
+
+      document.getElementById("rejectReason").disabled = s !== "REVIEWING";
+    }
+
+    function showJsonInOutput(objOrText) {
+      const out = document.getElementById("output");
+      if (typeof objOrText === "string") {
+        out.textContent = objOrText;
+        return;
+      }
+      out.textContent = JSON.stringify(objOrText, null, 2);
+      if (objOrText && objOrText.status) setStatusUi(objOrText.status);
+    }
+
+    async function refreshAction() {
+      const id = document.getElementById("actionId").value;
+      const out = document.getElementById("output");
+      out.textContent = "Loading...";
+      try {
+        const res = await fetch(`${API_BASE}/api/actions/${id}`);
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = null; }
+        if (!res.ok) {
+          out.textContent = text;
+          return;
+        }
+        showJsonInOutput(data);
+      } catch (e) {
+        out.textContent = "Error: " + e.message;
+      }
+    }
 
     async function transition(eventName) {
       const id = document.getElementById("actionId").value;
@@ -57,10 +167,32 @@
       try {
         const res = await fetch(`${API_BASE}/api/actions/${id}/${eventName}`, { method: "POST" });
         const text = await res.text();
-        out.textContent = text;
-        try {
-          out.textContent = JSON.stringify(JSON.parse(text), null, 2);
-        } catch { /* leave raw */ }
+        let data;
+        try { data = JSON.parse(text); } catch { data = null; }
+        if (!res.ok) {
+          out.textContent = text;
+          return;
+        }
+        showJsonInOutput(data || text);
+      } catch (e) {
+        out.textContent = "Error: " + e.message;
+      }
+    }
+
+    async function postPlain(segment) {
+      const id = document.getElementById("actionId").value;
+      const out = document.getElementById("output");
+      out.textContent = "Loading...";
+      try {
+        const res = await fetch(`${API_BASE}/api/actions/${id}/${segment}`, { method: "POST" });
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = null; }
+        if (!res.ok) {
+          out.textContent = text;
+          return;
+        }
+        showJsonInOutput(data || text);
       } catch (e) {
         out.textContent = "Error: " + e.message;
       }
@@ -77,14 +209,97 @@
           body: JSON.stringify({ reason: "Paused from UI test" })
         });
         const text = await res.text();
-        try {
-          out.textContent = JSON.stringify(JSON.parse(text), null, 2);
-        } catch {
+        let data;
+        try { data = JSON.parse(text); } catch { data = null; }
+        if (!res.ok) {
           out.textContent = text;
+          return;
         }
+        showJsonInOutput(data || text);
       } catch (e) {
         out.textContent = "Error: " + e.message;
       }
+    }
+
+    async function rejectAction() {
+      const id = document.getElementById("actionId").value;
+      const reason = document.getElementById("rejectReason").value.trim();
+      const out = document.getElementById("output");
+      out.textContent = "Loading...";
+      try {
+        const res = await fetch(`${API_BASE}/api/actions/${id}/reject`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason })
+        });
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = null; }
+        if (!res.ok) {
+          out.textContent = text;
+          return;
+        }
+        showJsonInOutput(data || text);
+      } catch (e) {
+        out.textContent = "Error: " + e.message;
+      }
+    }
+
+    async function loadUtilisations() {
+      const id = document.getElementById("actionId").value;
+      const tbody = document.getElementById("utilRows");
+      tbody.innerHTML = "";
+      try {
+        const res = await fetch(`${API_BASE}/api/actions/${id}/utilisations`);
+        const rows = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">No rows (action may not be completed yet).</td></tr>`;
+          return;
+        }
+        rows.forEach(r => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${r.assetId ?? ""}</td>
+            <td>${r.resourceTypeName ?? ""}</td>
+            <td>${r.startTime ?? ""}</td>
+            <td>${r.endTime ?? ""}</td>
+            <td>${r.durationMinutes ?? ""}</td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">${e.message}</td></tr>`;
+      }
+    }
+
+    async function loadSuspensions() {
+      const id = document.getElementById("actionId").value;
+      const tbody = document.getElementById("suspRows");
+      tbody.innerHTML = "";
+      try {
+        const res = await fetch(`${API_BASE}/api/actions/${id}/suspensions`);
+        const rows = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">No suspensions.</td></tr>`;
+          return;
+        }
+        rows.forEach(r => {
+          const tr = document.createElement("tr");
+          const dur = r.durationDisplay != null ? r.durationDisplay : (r.durationMinutes ?? "");
+          tr.innerHTML = `
+            <td>${r.id}</td>
+            <td>${escapeHtml(r.reason || "")}</td>
+            <td>${r.startDate ?? ""}</td>
+            <td>${r.endDate ?? ""}</td>
+            <td>${dur}</td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">${e.message}</td></tr>`;
+      }
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     }
 
     async function addAllocation() {
@@ -105,15 +320,15 @@
           })
         });
         const text = await res.text();
-        try {
-          out.textContent = JSON.stringify(JSON.parse(text), null, 2);
-        } catch {
-          out.textContent = text;
-        }
+        let data;
+        try { data = JSON.parse(text); } catch { data = null; }
+        showJsonInOutput(data || text);
       } catch (e) {
         out.textContent = "Error: " + e.message;
       }
     }
+
+    refreshAction();
   </script>
 </body>
 </html>

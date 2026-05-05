@@ -233,10 +233,37 @@ tbody tr:hover td { background: #fafafa; }
 
 .badge-proposed  { background: #f0f0f0; color: #555; }
 .badge-active    { background: #dcfce7; color: #15803d; }
+.badge-in_progress { background: #dcfce7; color: #15803d; }
+.badge-reviewing { background: #7C3AED; color: #fff; }
 .badge-suspended { background: #fef9c3; color: #a16207; }
 .badge-completed { background: #dbeafe; color: #1d4ed8; }
 .badge-abandoned { background: #fee2e2; color: #b91c1c; }
 .badge-pool      { background: #f3e8ff; color: #7e22ce; }
+
+/* ── Plan metrics panel ── */
+.metrics-panel {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  margin-top: 16px;
+}
+
+.metrics-box {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: #fafafa;
+  font-size: 13px;
+}
+
+.metrics-box strong {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
 
 /* ── Values ── */
 .negative { color: var(--danger); font-weight: 600; }

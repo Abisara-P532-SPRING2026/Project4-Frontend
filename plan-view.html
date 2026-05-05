@@ -29,13 +29,20 @@
       </div>
       <ul class="tree" id="tree"></ul>
     </div>
+    <div class="card">
+      <p class="card-title">Plan metrics</p>
+      <p class="card-sub"><code>GET /api/plans/{id}/metrics?type=progress|utilisation|overdue</code></p>
+      <button type="button" class="btn btn-primary" onclick="loadMetrics()">Load metrics</button>
+      <div class="metrics-panel" id="metricsPanel"></div>
+    </div>
   </main>
   <script>
     const API_BASE = "https://project4-backened.onrender.com";
 
     function statusBadge(status) {
-      const s = (status || "PROPOSED").toLowerCase();
-      return `<span class="badge badge-${s}">${s}</span>`;
+      const raw = (status || "PROPOSED").toLowerCase();
+      const label = raw.replace(/_/g, " ");
+      return `<span class="badge badge-${raw}">${label}</span>`;
     }
 
     /** Render a plan node (composite): actions then nested sub-plans (recursive). */
@@ -71,6 +78,38 @@
         tree.appendChild(renderPlanBranch(plan));
       } catch {
         tree.innerHTML = `<li style="color:var(--muted)">Could not load plan.</li>`;
+      }
+    }
+
+    async function loadMetrics() {
+      const id = document.getElementById("planId").value;
+      const panel = document.getElementById("metricsPanel");
+      panel.innerHTML = `<div class="metrics-box" style="grid-column:1/-1">Loading…</div>`;
+      try {
+        const progress = await fetch(`${API_BASE}/api/plans/${id}/metrics?type=progress`).then(r => r.json());
+        const utilisation = await fetch(`${API_BASE}/api/plans/${id}/metrics?type=utilisation`).then(r => r.json());
+        const overdue = await fetch(`${API_BASE}/api/plans/${id}/metrics?type=overdue`).then(r => r.json());
+
+        panel.innerHTML = "";
+
+        const progBox = document.createElement("div");
+        progBox.className = "metrics-box";
+        progBox.innerHTML = `<strong>Progress</strong>
+          total ${progress.total}, completed ${progress.completed}, ${Number(progress.percentComplete).toFixed(1)}%`;
+
+        const utilBox = document.createElement("div");
+        utilBox.className = "metrics-box";
+        utilBox.innerHTML = `<strong>Resource utilisation</strong><pre style="margin:0;background:transparent;color:inherit;padding:0;font-size:12px">${JSON.stringify(utilisation, null, 2)}</pre>`;
+
+        const odBox = document.createElement("div");
+        odBox.className = "metrics-box";
+        odBox.innerHTML = `<strong>Overdue</strong><pre style="margin:0;background:transparent;color:inherit;padding:0;font-size:12px">${JSON.stringify(overdue, null, 2)}</pre>`;
+
+        panel.appendChild(progBox);
+        panel.appendChild(utilBox);
+        panel.appendChild(odBox);
+      } catch (e) {
+        panel.innerHTML = `<div class="metrics-box" style="grid-column:1/-1;color:var(--danger)">${e.message}</div>`;
       }
     }
   </script>
