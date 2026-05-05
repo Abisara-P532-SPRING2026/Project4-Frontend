@@ -21,10 +21,9 @@
   <main class="main">
     <div class="card">
       <p class="card-title">Action Detail</p>
-      <p class="card-sub">Lifecycle transitions, review workflow (Week 2), utilisations, and suspension history.</p>
       <div class="field">
         <label for="actionId">Action ID</label>
-        <input id="actionId" type="number" value="104" min="1">
+        <input id="actionId" type="number" min="1" placeholder="Enter action id">
         <button type="button" class="btn btn-primary" onclick="refreshAction()">Refresh</button>
         <span id="statusBadge" class="badge badge-proposed">—</span>
       </div>
@@ -47,7 +46,6 @@
 
     <div class="card">
       <p class="card-title">Asset utilisations</p>
-      <p class="card-sub">Rows appear after an implemented action is completed or approved with ASSET allocations (<code>GET /api/actions/{id}/utilisations</code>).</p>
       <button type="button" class="btn btn-ghost" onclick="loadUtilisations()">Load utilisations</button>
       <table style="margin-top:12px">
         <thead>
@@ -65,7 +63,6 @@
 
     <div class="card">
       <p class="card-title">Suspension history</p>
-      <p class="card-sub"><code>GET /api/actions/{id}/suspensions</code> — ongoing suspensions show duration as “ongoing”.</p>
       <button type="button" class="btn btn-ghost" onclick="loadSuspensions()">Load suspensions</button>
       <table style="margin-top:12px">
         <thead>
@@ -82,8 +79,7 @@
     </div>
 
     <div class="card">
-      <p class="card-title">Add consumable allocation (test F8)</p>
-      <p class="card-sub">Attach a <strong>GENERAL</strong> consumable line with a large <strong>quantity</strong> (e.g. resource type <strong>3</strong> = Concrete in sample DB). Then <strong>Implement</strong> → <strong>Complete</strong>. On complete, the pool withdraws that quantity; if it goes negative, open <a href="ledger-view.html">Ledger</a> → memo account (see Dashboard) for alert entries.</p>
+      <p class="card-title">Add consumable allocation </p>
       <div class="field">
         <label for="resTypeId">Resource type ID</label>
         <input id="resTypeId" type="number" value="3" min="1" style="width:100px">

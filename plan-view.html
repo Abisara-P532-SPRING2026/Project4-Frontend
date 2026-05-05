@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plans — RPL</title>
+  <title>Plans RPL</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="page">
@@ -21,7 +21,6 @@
   <main class="main">
     <div class="card">
       <p class="card-title">Plan Tree</p>
-      <p class="card-sub">View nested sub-plans and actions from <code>GET /api/plans/{id}</code>.</p>
       <div class="field">
         <label for="planId">Plan ID</label>
         <input id="planId" type="number" value="1" min="1">
@@ -31,7 +30,6 @@
     </div>
     <div class="card">
       <p class="card-title">Plan metrics</p>
-      <p class="card-sub"><code>GET /api/plans/{id}/metrics?type=progress|utilisation|overdue</code></p>
       <button type="button" class="btn btn-primary" onclick="loadMetrics()">Load metrics</button>
       <div class="metrics-panel" id="metricsPanel"></div>
     </div>

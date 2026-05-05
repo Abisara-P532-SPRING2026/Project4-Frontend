@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard — RPL</title>
+  <title>Dashboard RPL</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="page">
@@ -59,6 +59,14 @@
         <input id="protocolDesc" type="text" style="width:260px" placeholder="Reusable protocol">
         <button class="btn btn-primary" onclick="createProtocol()">Create Protocol</button>
       </div>
+      <div class="field" style="align-items:flex-start">
+        <label for="protocolSteps" style="padding-top:6px">Steps</label>
+        <textarea id="protocolSteps" rows="4" style="width:min(620px,100%); border:1px solid var(--border); border-radius:4px; padding:8px 10px; font-size:13px; font-family:inherit;" placeholder="One step per line, e.g.
+Foundation
+Pour Concrete
+Install Beams"></textarea>
+      </div>
+      <p class="card-sub" style="margin-top:-8px">Optional. Add one step name per line; steps are created immediately after the protocol.</p>
 
       <div class="field">
         <label>Resource Name</label>
@@ -144,8 +152,21 @@
       try {
         const name = document.getElementById("protocolName").value.trim();
         const description = document.getElementById("protocolDesc").value.trim();
-        const data = await postJson(`${API_BASE}/api/protocols`, { name, description });
-        output.textContent = `Protocol created:\n${JSON.stringify(data, null, 2)}`;
+        const stepLinesRaw = document.getElementById("protocolSteps").value || "";
+        const steps = stepLinesRaw.split("\n").map(s => s.trim()).filter(Boolean);
+        if (!name) {
+          throw new Error("Protocol name is required");
+        }
+        const protocol = await postJson(`${API_BASE}/api/protocols`, { name, description });
+        const stepResults = [];
+        for (const stepName of steps) {
+          const createdStep = await postJson(`${API_BASE}/api/protocols/${protocol.id}/steps`, {
+            name: stepName,
+            dependsOn: []
+          });
+          stepResults.push(createdStep);
+        }
+        output.textContent = `Protocol created:\n${JSON.stringify(protocol, null, 2)}\n\nSteps created (${stepResults.length}):\n${JSON.stringify(stepResults, null, 2)}`;
       } catch (e) {
         output.textContent = `Error: ${e.message}`;
       }
@@ -157,6 +178,9 @@
         const name = document.getElementById("resourceName").value.trim();
         const kind = document.getElementById("resourceKind").value.trim().toUpperCase();
         const unit = document.getElementById("resourceUnit").value.trim();
+        if (!name) throw new Error("Resource name is required");
+        if (!kind) throw new Error("Resource kind is required");
+        if (!unit) throw new Error("Resource unit is required");
         const data = await postJson(`${API_BASE}/api/resource-types`, { name, kind, unit });
         output.textContent = `Resource type created:\n${JSON.stringify(data, null, 2)}`;
         load();
@@ -171,6 +195,8 @@
         const name = document.getElementById("planName").value.trim();
         const protocolIdRaw = document.getElementById("planProtocolId").value.trim();
         const protocolId = protocolIdRaw ? Number(protocolIdRaw) : null;
+        if (!name) throw new Error("Plan name is required");
+        if (protocolIdRaw && Number.isNaN(protocolId)) throw new Error("Protocol ID must be a number");
         const data = await postJson(`${API_BASE}/api/plans`, { name, protocolId, parentPlanId: null });
         output.textContent = `Plan created:\n${JSON.stringify(data, null, 2)}`;
       } catch (e) {
