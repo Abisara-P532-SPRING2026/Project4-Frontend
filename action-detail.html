@@ -79,13 +79,20 @@
     </div>
 
     <div class="card">
-      <p class="card-title">Add consumable allocation </p>
+      <p class="card-title">Add allocation</p>
       <div class="field">
         <label for="resTypeId">Resource type ID</label>
-        <input id="resTypeId" type="number" value="3" min="1" style="width:100px">
+        <input id="resTypeId" type="number" value="1" min="1" style="width:80px">
         <label for="allocQty">Quantity</label>
-        <input id="allocQty" type="number" value="500" min="0.01" step="any" style="width:120px">
-        <button type="button" class="btn btn-primary" onclick="addAllocation()">POST allocation</button>
+        <input id="allocQty" type="number" value="10" min="0.01" step="any" style="width:90px">
+        <label for="allocKind">Kind</label>
+        <select id="allocKind" style="width:110px" onchange="toggleAssetId()">
+          <option value="GENERAL">GENERAL</option>
+          <option value="SPECIFIC">SPECIFIC</option>
+        </select>
+        <label for="allocAssetId" id="assetIdLabel" style="display:none">Asset ID</label>
+        <input id="allocAssetId" type="text" placeholder="e.g. EXCAVATOR-01" style="width:140px;display:none">
+        <button type="button" class="btn btn-primary" onclick="addAllocation()">Add</button>
       </div>
     </div>
   </main>
@@ -298,22 +305,25 @@
       return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     }
 
+    function toggleAssetId() {
+      const specific = document.getElementById("allocKind").value === "SPECIFIC";
+      document.getElementById("assetIdLabel").style.display = specific ? "" : "none";
+      document.getElementById("allocAssetId").style.display = specific ? "" : "none";
+    }
+
     async function addAllocation() {
       const id = document.getElementById("actionId").value;
       const resourceTypeId = Number(document.getElementById("resTypeId").value);
       const quantity = Number(document.getElementById("allocQty").value);
+      const kind = document.getElementById("allocKind").value;
+      const assetId = kind === "SPECIFIC" ? document.getElementById("allocAssetId").value.trim() || null : null;
       const out = document.getElementById("output");
       out.textContent = "Loading...";
       try {
         const res = await fetch(`${API_BASE}/api/actions/${id}/allocations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            resourceTypeId,
-            quantity,
-            kind: "GENERAL",
-            assetId: null
-          })
+          body: JSON.stringify({ resourceTypeId, quantity, kind, assetId })
         });
         const text = await res.text();
         let data;
